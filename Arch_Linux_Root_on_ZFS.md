@@ -309,7 +309,7 @@ A minimal Arch Linux system with root on ZFS should now be configured.
 
 ### Create user
 
-```
+```sh
 zfs create -o mountpoint=/home/user rpool/DATA/home/user
 groupadd -g 1234 group
 useradd -g group -u 1234 -d /home/user -s /bin/bash user
@@ -321,7 +321,7 @@ chown -R user:group /home/user && chmod 700 /home/user
 
 ### Create additional pools and datasets
 
-```
+```sh
 zpool create \
     -O atime=off \
     -O acltype=posixacl -O canmount=off -O compression=lz4 \
@@ -337,7 +337,7 @@ zpool create \
 
 Create datasets:
 
-```
+```sh
 zfs create -o canmount=off -o mountpoint=none pool:a/DATA
 zfs create -o mountpoint=/path pool:a/DATA/path
 zfs create -o mountpoint=/path/games -o recordsize=1M pool:a/DATA/path/games
@@ -347,18 +347,20 @@ zfs create -o mountpoint=/path/backup -o compression=off pool:a/DATA/path/backup
 
 ### Create NFS share
 
-Set *Domain* in ```idmapd.conf``` on server and clients.
-```
+Set *Domain* in `idmapd.conf` on server and clients.
+
+```sh
 zfs set sharenfs=rw=@10.0.0.0/24 pool:a/DATA/path/name
 systemctl enable nfs-server.service zfs-share.service --now
 ```
+
 ### Increase the capacity of a mirrored `vdev`
 
 The following steps will replace all the disks in a mirrored `vdev` with larger ones.
 
 Before upgrade:
 
-```
+```sh
 zpool status lpool
   pool: lpool
  state: ONLINE
@@ -380,7 +382,7 @@ lpool   464G   218G   246G        -         -     9%    47%  1.00x    ONLINE  -
 
 The `autoexpand` property on the pool should be set to `on`. 
 
-```
+```sh
 zpool get autoexpand lpool
 NAME   PROPERTY    VALUE   SOURCE
 lpool  autoexpand  off     default
@@ -388,13 +390,13 @@ lpool  autoexpand  off     default
 
 If it's not, set it:
 
-```
+```sh
 zpool set autoexpand=on lpool
 ```
 
 Power off the machine, physically replace one of drives using the same slot or cable, then power it back on. After replacing the drive, `zpool status` shows the following:
 
-```
+```sh
 zpool status lpool
   pool: lpool
  state: DEGRADED 
@@ -417,13 +419,13 @@ errors: No known data errors
 
 Replace the drive in pool (here, `nvme-Samsung_SSD_970_EVO_500GB_S466NB0K621937D` is the old, now replaced drive):
 
-```
+```sh
 zpool replace lpool /dev/disk/by-id/nvme-Samsung_SSD_970_EVO_500GB_S466NB0K621937D /dev/disk/by-id/nvme-Samsung_SSD_990_PRO_2TB_S6Z2NF0W836871V
 ```
 
 The new drive is now resilvering:
 
-```
+```sh
 zpool status lpool
   pool: lpool
  state: DEGRADED
@@ -448,7 +450,7 @@ errors: No known data errors
 
 Wait for resilver to finish:
 
-```
+```sh
 zpool status lpool
   pool: lpool
  state: ONLINE
@@ -466,13 +468,13 @@ errors: No known data errors
 
 Scrub the pool
 
-```
+```sh
 zpool scrub lpool
 ```
 
 and wait until it's finished:
 
-```
+```sh
 zpool status lpool
   pool: lpool
  state: ONLINE
@@ -490,7 +492,7 @@ errors: No known data errors
 
 Physically replace the second disk using the same slot or cable; after powering on the machine, the pool is again in a degraded state:
 
-```
+```sh
 zpool status lpool
   pool: lpool
  state: DEGRADED
@@ -513,12 +515,13 @@ errors: No known data errors
 
 Replace the second drive in the pool:
 
-```
+```sh
 zpool replace lpool /dev/disk/by-id/nvme-Samsung_SSD_970_EVO_500GB_S466NB0K683727V /dev/disk/by-id/nvme-Samsung_SSD_990_PRO_2TB_S6Z2NF0W932278L
 ```
+
 The second drive is now resilvering:
 
-```
+```sh
 zpool status lpool
   pool: lpool
  state: DEGRADED
@@ -543,7 +546,7 @@ errors: No known data errors
 
 Wait for resilvering to finish:
 
-```
+```sh
 zpool status lpool
   pool: lpool
  state: ONLINE
@@ -561,7 +564,7 @@ errors: No known data errors
 
 Scrub pool again:
 
-```
+```sh
 zpool scrub lpool && zpool status lpool
   pool: lpool
  state: ONLINE
@@ -578,9 +581,10 @@ config:
 
 errors: No known data errors
 ```
+
 Check pool:
 
-```
+```sh
 zpool status lpool
   pool: lpool
  state: ONLINE
@@ -598,14 +602,14 @@ errors: No known data errors
 
 New pool size:
 
-```
+```sh
 zpool list lpool  
 NAME    SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
 lpool  1.82T   218G  1.60T        -         -     2%    11%  1.00x    ONLINE  -
 ```
 ___
 
-#### References:
+### References:
 
 1. [https://wiki.archlinux.org/index.php/Install_Arch_Linux_on_ZFS](https://wiki.archlinux.org/index.php/Install_Arch_Linux_on_ZFS)
 2. [https://wiki.archlinux.org/index.php/ZFS](https://wiki.archlinux.org/index.php/ZFS)
