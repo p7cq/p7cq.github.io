@@ -1,1 +1,2 @@
 - [OpenWrt on Raspberry Pi 5](./OpenWrt_on_Raspberry_Pi_5.md)
+- [Arch Linux Root on ZFS](./Arch_Linux_Root_on_ZFS.md)
