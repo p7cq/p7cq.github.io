@@ -2,7 +2,7 @@
 
 Installation steps for running Arch Linux with root on ZFS using UEFI and ```systemd-boot```. All steps are run as ```root```.
 
-Requires an Arch Linux image with ZFS built-in (see [References](#References)).
+Requires an Arch Linux image with ZFS built-in (see [References](#references)).
 
 ### In live environment
 
