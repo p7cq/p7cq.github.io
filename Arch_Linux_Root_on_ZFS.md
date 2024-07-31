@@ -8,27 +8,27 @@ Requires an Arch Linux image with ZFS built-in (see [References](#References)).
 
 If using KVM, add a *Serial* number for each virtual disk and reboot the VM. The disks should now be available in `/dev/disk/by-id` as `virtio-<Serial>`.
 
-- Set a bigger font if needed:
+Set a bigger font if needed:
 
-```
+```sh
 setfont latarcyrheb-sun32
 ```
 
-- To setup Wi-Fi, add the *ESSID* and passphrase:
-```
+To setup Wi-Fi, add the *ESSID* and passphrase:
+```sh
  wpa_passphrase ESSID PASSPHRASE > /etc/wpa_supplicant/wpa_supplicant.conf
 ```
 
-- Start *wpa_supplicant* and get an IP address:
+Start *wpa_supplicant* and get an IP address:
 
-```
+```sh
 wpa_supplicant -B -c /etc/wpa_supplicant/wpa_supplicant.conf -i <wifi interface>
 dhclient <wifi interface>
 ```
 
-- Wipe disks, create *boot*, *swap* and ZFS partitions:
+Wipe disks, create *boot*, *swap* and ZFS partitions:
 
-```
+```sh
 sgdisk --zap-all /dev/disk/by-id/<disk0>
 sgdisk -n1:0:+512M -t1:ef00 /dev/disk/by-id/<disk0>
 sgdisk -n2:0:+8G -t2:8200 /dev/disk/by-id/<disk0>
@@ -39,32 +39,37 @@ sgdisk -n1:0:+512M -t1:ef00 /dev/disk/by-id/<disk1>
 sgdisk -n2:0:+8G -t2:8200 /dev/disk/by-id/<disk1>
 sgdisk -n3:0:+210G -t3:bf00 /dev/disk/by-id/<disk1>
 ```
-You can also use a ```zvol``` for swap, but see [this](https://wiki.archlinux.org/index.php/ZFS#Swap_volume) first.
+You can also use a `zvol` for swap, but see [this](https://wiki.archlinux.org/index.php/ZFS#Swap_volume) first.
 
-- Format boot and swap partitions
-```
+Format boot and swap partitions:
+
+```sh
 mkfs.vfat /dev/disk/by-id/<disk0>-part1
 mkfs.vfat /dev/disk/by-id/<disk1>-part1
 
 mkswap /dev/disk/by-id/<disk0>-part2
 mkswap /dev/disk/by-id/<disk1>-part2
 ```
-- Create swap
-```
+
+Create swap:
+
+```sh
 swapon /dev/disk/by-id/<disk0>-part2 /dev/disk/by-id/<disk1>-part2
 ```
 
-- On choosing ```ashift```
+On choosing `ashift`:
 
 *You should specify an ashift when that value is too low for what you actually need, either today (disk lies) or into the future (replacement disks will be AF)*. Looks like a sound advice to me. If in doubt, [clarify](https://jrs-s.net/2018/08/17/zfs-tuning-cheat-sheet/) before going any further.
 
 Disk block size check:
-```
+
+```sh
 cat /sys/class/block/<disk>/queue/{phys,log}ical_block_size
 ```
 
-- Create pool (here's for a RAID 0 equivalent, all-flash drives):
-```
+Create pool (here's for a RAID 0 equivalent, all-flash drives):
+
+```sh
 zpool create \
     -o ashift=12 \
     -o autotrim=on \
@@ -74,16 +79,17 @@ zpool create \
     -O xattr=sa -O devices=off -O mountpoint=none -R /mnt rpool /dev/disk/by-id/<disk0>-part3 /dev/disk/by-id/<disk1>-part3
 ```
 
-If the pool is larger than 10 disks you should identify them ```by-path``` or ```by-vdev``` (see [here](https://openzfs.github.io/openzfs-docs/Project%20and%20Community/FAQ.html#selecting-dev-names-when-creating-a-pool-linux) for more details).
+If the pool is larger than 10 disks you should identify them `by-path` or `by-vdev` (see [here](https://openzfs.github.io/openzfs-docs/Project%20and%20Community/FAQ.html#selecting-dev-names-when-creating-a-pool-linux) for more details).
 
-Check ```ashift``` with:
+Check `ashift` with:
 
-```
+```sh
 zdb -C | grep ashift
 ```
 
-- Create datasets:
-```
+Create datasets:
+
+```sh
 zfs create -o canmount=off -o mountpoint=none rpool/ROOT
 zfs create -o mountpoint=/ -o canmount=noauto rpool/ROOT/default
 zfs create -o mountpoint=none rpool/DATA
@@ -94,139 +100,163 @@ zfs create -o mountpoint=none rpool/DATA/var
 zfs create -o mountpoint=/var/log rpool/DATA/var/log # after a rollback, systemd-journal blocks at reboot without this dataset
 ```
 
-- Create swap (not needed if you have dedicated partitions, like above)
+Create swap (not needed if you have dedicated partitions, like above):
 
-```
+```sh
 zfs create -V 16G -b $(getconf PAGESIZE) -o compression=zle -o logbias=throughput -o sync=always -o primarycache=metadata -o secondarycache=none -o com.sun:auto-snapshot=false rpool/swap
 mkswap /dev/zvol/rpool/swap
 ```
 
-- Unmount all
-```
+Unmount all:
+
+```sh
 zfs umount -a
 rm -rf /mnt/*
 ```
 
-- Export, then import pool:
-```
+Export, then import pool:
+
+```sh
 zpool export rpool
 zpool import -d /dev/disk/by-id -R /mnt rpool -N
 ```
 
-- Mount root, then the other datasets:
-```
+Mount root, then the other datasets:
+
+```sh
 zfs mount rpool/ROOT/default
 zfs mount -a
 ```
 
-- Mount boot partition:
-```
+Mount boot partition:
+
+```sh
 mkdir /mnt/boot
 mount /dev/disk/by-id/<disk0>-part1 /mnt/boot
 ```
 
-- Generate `fstab`:
-```
+Generate `fstab`:
+
+```sh
 mkdir /mnt/etc
 genfstab -U /mnt >> /mnt/etc/fstab
 ```
 
-- Add swap (not needed if you created swap partitions, like above):
-```
+Add swap (not needed if you created swap partitions, like above):
+
+```sh
 echo "/dev/zvol/rpool/swap    none       swap  discard                    0  0" >> /mnt/etc/fstab
 ```
 
-- Install the base system:
-```
+Install the base system:
+
+```sh
 pacstrap /mnt base base-devel linux linux-firmware vim
 ```
+
 If it fails, add GPG keys (see bellow).
 
-- Change root into the new system:
-```
+Change root into the new system:
+
+```sh
 arch-chroot /mnt
 ```
+
 ### In chroot
 
-- Remove all lines in ```/etc/fstab```, leaving only the entries for ```swap``` and ```boot```; for `boot`, change `fmask` and `dmask` to `0077`.
+Remove all lines in `/etc/fstab`, leaving only the entries for `swap` and `boot`; for `boot`, change `fmask` and `dmask` to `0077`.
 
-- Add ZFS repository in ```/etc/pacman.conf```:
-```
+Add ZFS repository in `/etc/pacman.conf`:
+
+```sh
 [archzfs]
 Server = https://archzfs.com/$repo/x86_64
 ```
 
-- Add GPG keys:
-```
+Add GPG keys:
+
+```sh
 curl -O https://archzfs.com/archzfs.gpg
 pacman-key -a archzfs.gpg
 pacman-key --lsign-key DDF7DB817396A49B2A2723F7403BD972F75D9D76
 pacman -Syy
 ```
 
-- Configure time zone (change accordingly):
-```
-ln -sf /usr/share/zoneinfo/Region/City /etc/localtime
+Configure time zone (change accordingly):
+
+```sh
+ln -sf /usr/share/zoneinfo/Europe/Bucharest /etc/localtime
 hwclock --systohc
 ```
 
-- Generate locale (change accordingly):
-```
+Generate locale (change accordingly):
+
+```sh
 sed -i 's/#\(en_US\.UTF-8\)/\1/' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 ```
 
-- Configure **vconsole**, **hostname**, **hosts**:
-```
+Configure **vconsole**, **hostname**, **hosts**:
+
+```sh
 echo -e "KEYMAP=us\n#FONT=latarcyrheb-sun32" > /etc/vconsole.conf
 echo al-zfs > /etc/hostname
 echo -e "127.0.0.1 localhost\n::1 localhost" >> /etc/hosts
 ```
 
-- Set root password
+Set root password
 
-- Install ZFS, microcode etc:
-```
+Install ZFS, microcode etc:
+
+```sh
 pacman -Syu archzfs-linux amd-ucode networkmanager sudo openssh rsync borg
 ```
+
 Choose the default option (`all`) for the *archzfs* group.
 
-For Intel processors install ```intel-ucode``` instead of ```amd-ucode```.
+For Intel processors install `intel-ucode` instead of `amd-ucode`.
 
-- Generate host id:
-```
+Generate host id:
+
+```sh
 zgenhostid $(hostid)
 ```
 
-- Create cache file:
-```
+Create cache file:
+
+```sh
 zpool set cachefile=/etc/zfs/zpool.cache rpool
 ```
 
-- Configure initial ramdisk in ```/etc/mkinitcpio.conf``` by removing `fsck` and adding `zfs` after `keyboard`:
+Configure initial ramdisk in `/etc/mkinitcpio.conf` by removing `fsck` and adding `zfs` after `keyboard`:
 
 <pre><code>HOOKS=(base udev autodetect modconf kms keyboard keymap consolefont block <b>zfs</b> filesystems)</code></pre>
 
 Regenerate environment:
-```
+
+```sh
 mkinitcpio -p linux
 ```
 
-- Enable ZFS services:
-```
+Enable ZFS services:
+
+```sh
 systemctl enable zfs.target
 systemctl enable zfs-import-cache.service
 systemctl enable zfs-mount.service
 systemctl enable zfs-import.target
 ```
 
-- Install the bootloader:
-```
+Install the bootloader:
+
+```sh
 bootctl --path=/boot install
 ```
-- Add an EFI boot manager update hook in */etc/pacman.d/hooks/100-systemd-boot.hook*:
-```
+
+Add an EFI boot manager update hook in */etc/pacman.d/hooks/100-systemd-boot.hook*:
+
+```sh
 [Trigger]
 Type = Package
 Operation = Upgrade
@@ -238,35 +268,42 @@ When = PostTransaction
 Exec = /usr/bin/bootctl update
 ```
 
-- Replace content of */boot/loader/loader.conf* with:
-```
+Replace content of */boot/loader/loader.conf* with:
+
+```sh
 default arch
 timeout 3
 # bigger boot menu on a 4K laptop display
 #console-mode 1
 ```
-- Create a */boot/loader/entries/**arch**.conf* containing:
-```
+
+Create a */boot/loader/entries/**arch**.conf* containing:
+
+```sh
 title Arch Linux
 linux /vmlinuz-linux
 initrd /amd-ucode.img
 initrd /initramfs-linux.img
 options zfs=rpool/ROOT/default rw
 ```
-If using an Intel processor, replace ```/amd-ucode.img``` with ```/intel-ucode.img```.
-- Exit and unmount all:
-```
+
+If using an Intel processor, replace `/amd-ucode.img` with `/intel-ucode.img`.
+
+Exit and unmount all:
+
+```sh
 exit
 zfs umount -a
 umount -R /mnt
 ```
 
-- *Export pool*:
-```
+*Export pool*:
+
+```sh
 zpool export rpool
 ```
 
-- Reboot
+Reboot
 
 A minimal Arch Linux system with root on ZFS should now be configured.
 
