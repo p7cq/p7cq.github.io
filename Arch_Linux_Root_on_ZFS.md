@@ -609,7 +609,7 @@ lpool  1.82T   218G  1.60T        -         -     2%    11%  1.00x    ONLINE  -
 ```
 ___
 
-### References:
+### References
 
 1. [https://wiki.archlinux.org/index.php/Install_Arch_Linux_on_ZFS](https://wiki.archlinux.org/index.php/Install_Arch_Linux_on_ZFS)
 2. [https://wiki.archlinux.org/index.php/ZFS](https://wiki.archlinux.org/index.php/ZFS)
